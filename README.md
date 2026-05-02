@@ -17,7 +17,7 @@ https://firtel-t.github.io/dmc-100-ble/
 - BLE（Bluetooth Low Energy）デバイスとブラウザで直接通信
 - 測定データのリアルタイム表示
 - CSVエクスポートによるログ保存
-- 専用アプリ不要（Bluefyだけで動作）
+- iOSの制約でBluefyアプリが必要
 
 ---
 
