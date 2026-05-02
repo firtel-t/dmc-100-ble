@@ -20,10 +20,10 @@ The objectives of this project are:
 ---
 
 ## Communication Specifications
-This app uses the **Nordic UART Service (NUS)** over BLE.
-- **TX Characteristic:** Data transmission
-- **RX Characteristic:** Data reception
-The configuration handles byte streams just like a standard UART.
+This application uses **Nordic UART Service (NUS)** over BLE.
+- RX (Notify): Receiving measurement data from the device
+Currently, this application is **receive-only** and does not send commands to the device.
+Data is handled as a byte stream, similar to standard UART communication.
 
 ---
 
