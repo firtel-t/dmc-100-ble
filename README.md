@@ -7,6 +7,8 @@ Since it uses the **Web Bluetooth API**, you can acquire and visualize data with
 For iOS users, it can be used by running the **Bluefy** app and opening:
 [https://firtel-t.github.io/dmc-100-ble/](https://firtel-t.github.io/dmc-100-ble/)
 
+Currently, this web app only supports the simultaneous voltage and current measurement mode of the DMC-100.
+
 ---
 
 ## Overview
