@@ -9,6 +9,8 @@ iPhone上でBluefyアプリを実行して
 https://firtel-t.github.io/dmc-100-ble/
 を開くと使うことが出来ます。
 
+---
+
 ## 概要
 このプロジェクトは以下を目的としています：
 
@@ -34,13 +36,12 @@ UARTのようにバイト列をそのまま扱う構成です。
 
 ##  関連記事
 開発の詳細はこちら：
-- https://firtel.blogspot.com/2026/05/fnirsi-dmc-100-bluetooth.html
-- https://firtel.blogspot.com/2026/04/nrf52840-uart-ble.html
-- https://firtel.blogspot.com/2026/04/fnirsi-dmc-100-uart-output.html
+- [DMC-100通信内容解析](https://firtel.blogspot.com/2026/04/fnirsi-dmc-100-uart-output.html)
+- [nRF52840用スケッチ](https://firtel.blogspot.com/2026/04/nrf52840-uart-ble.html)
+- [DMC-100にBLEモジュールを内蔵](https://firtel.blogspot.com/2026/05/fnirsi-dmc-100-bluetooth.html)
 
 ---
 
 ## 注意事項
 - Web Bluetoothはブラウザの制限があります
 - iOS Safariでは動作しません
-- BLE通信は環境によって不安定になる場合があります
