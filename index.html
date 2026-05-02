@@ -238,7 +238,7 @@ window.onload = () => {
     connectBtn.onclick = async () => {
         try {
             bluetoothDevice = await navigator.bluetooth.requestDevice({ 
-                filters: [{ name: 'DMC100-BLE' }], 
+                filters: [{ name: 'DMC-100' }], 
                 optionalServices: [SERVICE_UUID] 
             });
             
