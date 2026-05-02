@@ -128,7 +128,7 @@ const statusSpan = document.getElementById('status');
 // 接続処理
 connectBtn.addEventListener('click', async () => {
     try {
-        bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ name: 'DMC100-BLE' }], optionalServices: [SERVICE_UUID] });
+        bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ name: 'DMC-100' }], optionalServices: [SERVICE_UUID] });
         bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
         const server = await bluetoothDevice.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
