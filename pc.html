@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DMC-100 Web Logger</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* 屋外視認性重視のホワイト基調スタイル */
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #ffffff; color: #000000; padding: 15px; margin: 0; }
+        .container { max-width: 1100px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; background: #f9f9f9; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        
+        /* コントロール周り */
+        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        button { padding: 10px 18px; font-weight: bold; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; transition: 0.1s; font-size: 14px; }
+        #connectBtn { background: #28a745; color: #fff; border-color: #28a745; }
+        #connectBtn:hover { background: #218838; }
+        #disconnectBtn { background: #dc3545; color: #fff; border-color: #dc3545; }
+        #disconnectBtn:hover { background: #c82333; }
+        button:disabled { background: #e0e0e0 !important; color: #a0a0a0 !important; border-color: #ccc !important; cursor: not-allowed; }
+        
+        /* 各パネル */
+        .panel { background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #eaeaea; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .log-panel { border-left: 4px solid #007bff; }
+        
+        /* 数値ディスプレイ（コントラスト重視） */
+        .displays { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
+        .val-box { text-align: center; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; background: #fff; }
+        .label { font-size: 0.85em; color: #555; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; }
+        .value { font-size: 2em; font-weight: bold; font-family: 'Consolas', 'Courier New', monospace; color: #000; }
+        
+        /* グラフエリア */
+        .canvas-container { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #eaeaea; height: 400px; margin-bottom: 15px; }
+        
+        /* スライダー */
+        input[type="range"] { cursor: pointer; width: 200px; }
+        #status { font-weight: bold; padding: 5px 10px; border-radius: 4px; background: #eee; }
+        .connected { background: #d4edda !important; color: #155724; }
+        .disconnected { background: #f8d7da !important; color: #721c24; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="controls">
+        <button id="connectBtn">Connect BLE</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+        <span id="status" class="disconnected">Disconnected</span>
+    </div>
+
+    <div class="panel">
+        <label style="font-weight:bold;">Graph Length:</label>
+        <input type="range" id="lengthSlider" min="10" max="300" value="60">
+        <span id="lengthLabel" style="font-family:monospace;">60 points</span>
+    </div>
+
+    <div class="panel log-panel">
+        <button id="startLogBtn" disabled style="background:#007bff; color:#fff; border-color:#007bff;">Start Log</button>
+        <button id="stopLogBtn" disabled style="background:#ffc107; color:#000; border-color:#ffc107;">Stop Log</button>
+        <button id="downloadBtn" disabled style="background:#f8f9fa; color:#000;">Download CSV</button>
+        <div style="margin-left:auto; font-size:0.9em; padding: 8px; background:#f0f0f0; border-radius:4px;">
+            Log Count: <b id="logCount" style="color:#007bff; font-size:1.1em;">0</b> rows
+        </div>
+    </div>
+
+    <div class="displays">
+        <div class="val-box"><div class="label">MAIN (Voltage)</div><div class="value" id="mainValDisp" style="color:#1a7f37;">--.--- V</div></div>
+        <div class="val-box"><div class="label">SUB (Current)</div><div class="value" id="subValDisp" style="color:#bf8700;">--.-- A</div></div>
+        <div class="val-box"><div class="label">POWER (Watt)</div><div class="value" id="wattValDisp" style="color:#0969da;">--.-- W</div></div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="realtimeChart"></canvas>
+    </div>
+</div>
+
+<script>
+// --- BLE & 解析ロジック (変更なし) ---
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const CHARACTERISTIC_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+const DECODE_TABLE = { 0x7B:"0", 0x0A:"1", 0x5D:"2", 0x4F:"3", 0x2E:"4", 0x67:"5", 0x77:"6", 0x4A:"7", 0x7F:"8", 0x6F:"9", 0x31:"L", 0x00:" ", 0x13:"V", 0x75:"E" };
+
+let bluetoothDevice = null, chart = null, isLogging = false, logData = [];
+let maxPoints = 60;
+
+// --- グラフ初期化 (ホワイトモード用に色と太さを調整) ---
+function initChart() {
+    Chart.defaults.color = '#333'; // 全体の文字色を濃く
+    Chart.defaults.borderColor = '#e0e0e0'; // グリッド線を薄い灰色に
+
+    const ctx = document.getElementById('realtimeChart').getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Volt', data: [], borderColor: '#1a7f37', yAxisID: 'y', borderWidth: 2.5, pointRadius: 0, tension: 0.1 }, // 濃い緑、太め
+                { label: 'Amp', data: [], borderColor: '#bf8700', yAxisID: 'y1', borderWidth: 2.5, pointRadius: 0, tension: 0.1 }, // 濃い橙、太め
+                { label: 'Watt', data: [], borderColor: '#0969da', yAxisID: 'y2', borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, tension: 0.1 } // 濃い青、点線
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { display: false },
+                y: { position: 'left', title: { display: true, text: 'Voltage (V)', color: '#1a7f37', font: {weight:'bold'} }, ticks: { color: '#1a7f37' } },
+                y1: { position: 'right', title: { display: true, text: 'Current (A)', color: '#bf8700', font: {weight:'bold'} }, ticks: { color: '#bf8700' }, grid: { drawOnChartArea: false } },
+                y2: { position: 'right', title: { display: true, text: 'Power (W)', color: '#0969da', font: {weight:'bold'} }, ticks: { color: '#0969da' }, grid: { drawOnChartArea: false }, offset: true }
+            },
+            plugins: { 
+                legend: { position: 'top', labels: { boxWidth: 20, font: { size: 13, weight: 'bold' } } },
+                tooltip: { enabled: false } // 屋外ではツールチップは見づらいのでオフ
+            },
+            animation: false // パフォーマンスと見やすさのためアニメーションオフ
+        }
+    });
+}
+
+// --- UI制御 & 調整スライダー ---
+document.getElementById('lengthSlider').addEventListener('input', (e) => {
+    maxPoints = parseInt(e.target.value);
+    document.getElementById('lengthLabel').textContent = `${maxPoints} points`;
+});
+
+const connectBtn = document.getElementById('connectBtn'), disconnectBtn = document.getElementById('disconnectBtn');
+const startLogBtn = document.getElementById('startLogBtn'), stopLogBtn = document.getElementById('stopLogBtn'), downloadBtn = document.getElementById('downloadBtn');
+const statusSpan = document.getElementById('status');
+
+// 接続処理
+connectBtn.addEventListener('click', async () => {
+    try {
+        bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ name: 'DMC100-BLE' }], optionalServices: [SERVICE_UUID] });
+        bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+        const server = await bluetoothDevice.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+        await characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', (e) => handleData(new Uint8Array(e.target.value.buffer)));
+        
+        statusSpan.textContent = "Connected";
+        statusSpan.className = "connected";
+        connectBtn.disabled = true; disconnectBtn.disabled = false; startLogBtn.disabled = false;
+    } catch (err) { console.error(err); statusSpan.textContent = "Error"; statusSpan.className = "disconnected"; }
+});
+
+disconnectBtn.addEventListener('click', () => bluetoothDevice.gatt.disconnect());
+
+function onDisconnected() {
+    statusSpan.textContent = "Disconnected";
+    statusSpan.className = "disconnected";
+    connectBtn.disabled = false; disconnectBtn.disabled = true; startLogBtn.disabled = true; stopLogBtn.disabled = true;
+}
+
+// ロギング処理
+startLogBtn.addEventListener('click', () => { isLogging = true; logData = [["Time", "Voltage(V)", "Ampere(A)", "Wattage(W)"]]; startLogBtn.disabled = true; stopLogBtn.disabled = false; downloadBtn.disabled = false; document.getElementById('logCount').textContent = "0"; });
+stopLogBtn.addEventListener('click', () => { isLogging = false; startLogBtn.disabled = false; stopLogBtn.disabled = true; downloadBtn.disabled = false; });
+downloadBtn.addEventListener('click', () => {
+    const blob = new Blob([logData.map(e => e.join(",")).join("\n")], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `DMC100_Log_${Date.now()}.csv`; a.click();
+});
+
+// --- データ処理コアロジック (変更なし) ---
+function handleData(frame) {
+    if (frame.length !== 13) return;
+    let digits = [];
+    for (let i = 2; i < 6; i++) digits.push(DECODE_TABLE[((frame[i] >> 1) & 0x70) | (frame[i+1] & 0x0f)] || "0");
+    let dots = [];
+    for (let i = 3; i < 7; i++) dots.push((frame[i] & 0x10) !== 0);
+    let vStr = digits.join("");
+    const decPos = dots.indexOf(true) + 1;
+    if (decPos > 0) vStr = vStr.slice(0, decPos) + "." + vStr.slice(decPos);
+    
+    // 単位（V, Hzなど）の判定
+    const unitCode = (frame[7] & 0xf0) | (frame[8] & 0x0f);
+    const mainUnit = (unitCode === 0x04) ? "Hz" : "V";
+
+    const v = parseFloat(vStr) * ((frame[2] & 0x10) ? -1 : 1);
+    const a = ((frame[11] << 8) | frame[12]) * 0.01 * ((frame[10] & 0x40) ? -1 : 1);
+    const w = v * a;
+
+    // 画面表示更新
+    document.getElementById('mainValDisp').textContent = `${vStr} ${mainUnit}`;
+    document.getElementById('subValDisp').textContent = `${a.toFixed(2)} A`;
+    document.getElementById('wattValDisp').textContent = `${w.toFixed(2)} W`;
+
+    // グラフデータ更新
+    chart.data.labels.push("");
+    chart.data.datasets[0].data.push(v);
+    chart.data.datasets[1].data.push(a);
+    chart.data.datasets[2].data.push(w);
+    
+    // 表示数の調整
+    while (chart.data.labels.length > maxPoints) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(d => d.data.shift());
+    }
+    chart.update('none'); // 高速描画
+
+    // ロギング
+if (isLogging) {
+    const now = new Date();
+    
+    // 日本時間のタイムスタンプ作成 (YYYY-MM-DD HH:mm:ss.sss)
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const ms = String(now.getMilliseconds()).padStart(2, '000').slice(0, 3);
+    
+    const timeStr = `${y}-${m}-${d} ${hh}:${mm}:${ss}.${ms}`;
+
+    // CSVに保存（UnixTimeの代わりに日付文字列を入れる）
+    const row = [timeStr, v.toFixed(3), a.toFixed(2), w.toFixed(2)];
+    logData.push(row);
+    document.getElementById('logCount').textContent = logData.length - 1;
+}
+}
+
+// 初期化
+initChart();
+</script>
+</body>
+</html>
