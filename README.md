@@ -29,6 +29,7 @@ This application uses **Nordic UART Service (NUS)** over BLE.
 Currently, this application is **receive-only** and does not send commands to the device.
 
 Data is handled as a byte stream, similar to standard UART communication.
+
 ---
 
 ## CSV Export
