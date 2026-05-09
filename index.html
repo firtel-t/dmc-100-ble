@@ -145,10 +145,11 @@ function initChart() {
     chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: [], // 動的に追加
+            labels: [],
             datasets: [
                 { label: 'Volt', data: [], borderColor: '#1a7f37', yAxisID: 'y', borderWidth: 2, pointRadius: 0, tension: 0.1 },
                 { label: 'Amp', data: [], borderColor: '#bf8700', yAxisID: 'y1', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+                // y2軸（右側第2軸）を使用するように設定
                 { label: 'Watt', data: [], borderColor: '#0969da', yAxisID: 'y2', borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, tension: 0.1 }
             ]
         },
@@ -159,10 +160,17 @@ function initChart() {
                 x: { display: false },
                 y: { position: 'left', title: { display: true, text: 'V' } },
                 y1: { position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'A' } },
-                y2: { display: false } 
+                // --- ここを修正：displayをtrueにし、位置を右側に配置 ---
+                y2: { 
+                    display: true, 
+                    position: 'right', 
+                    grid: { drawOnChartArea: false }, 
+                    title: { display: true, text: 'W' },
+                    // 電圧や電流の軸と重なりすぎないよう、少し外側にずらす設定（必要に応じて）
+                } 
             },
             plugins: { legend: { position: 'top', labels: { boxWidth: 15 } } },
-            animation: false // 描画負荷を抑えてフリーズを防ぐ
+            animation: false
         }
     });
 }
