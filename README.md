@@ -49,3 +49,4 @@ For more details on the development process, please refer to the following (Japa
 ## Notes
 - Web Bluetooth has specific browser limitations.
 - It will **not** work on iOS Safari. Please use Bluefy or other Web Bluetooth-compatible browsers on iOS.
+- When you cannot find device on iOS. Please check with nRF Connect App that you can scan and connect to device.
